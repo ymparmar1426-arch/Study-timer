@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Study timer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1D6B66">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Study timer">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#F2F4F5; --surface:#FFFFFF; --ink:#16222A; --muted:#5B6870; --line:#D9DFE2;
+  --study:#1D6B66; --brk:#9A6412; --dis:#B4443C; --on:#FFFFFF; --soft:#E6EEED;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#10181C; --surface:#18232A; --ink:#E7EEF1; --muted:#93A3AC; --line:#2A3841;
+    --study:#3FAFA6; --brk:#E0A53B; --dis:#E07A70; --on:#0B1519; --soft:#1E2E33;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:"Avenir Next","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;font-size:16px;line-height:1.4;-webkit-text-size-adjust:100%}
+body{display:flex;justify-content:center}
+#shell{width:100%;max-width:480px;min-height:100vh;display:flex;flex-direction:column}
+#app{flex:1;padding:16px 16px 24px}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--study);outline-offset:2px}
+h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:15px;font-weight:700;margin:22px 0 10px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.num{font-variant-numeric:tabular-nums}
+
+/* tab bar */
+#tabs{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+#tabs button{padding:14px 0;font-weight:600;color:var(--muted);border-top:3px solid transparent}
+#tabs button[aria-current="page"]{color:var(--ink);border-top-color:var(--study)}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;padding:0 16px;border-radius:22px;border:1.5px solid var(--line);background:var(--surface);font-weight:600}
+.chip[aria-pressed="true"]{background:var(--study);border-color:var(--study);color:var(--on)}
+.field-label{font-size:13px;color:var(--muted);margin:18px 0 8px;display:block}
+input[type=text],input[type=date],input[type=time],input[type=number],textarea{width:100%;min-height:48px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+textarea{min-height:90px;resize:vertical}
+
+.btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:56px;border-radius:14px;font-weight:700;font-size:17px}
+.btn-primary{background:var(--study);color:var(--on)}
+.btn-line{border:1.5px solid var(--line);background:var(--surface)}
+.btn-danger{border:1.5px solid var(--dis);color:var(--dis);background:transparent}
+
+.today{display:flex;gap:18px;margin:6px 0 4px;color:var(--muted);font-size:14px}
+.today b{color:var(--ink)}
+
+/* running panel */
+.panel{border-radius:22px;padding:26px 20px 22px;background:var(--study);color:var(--on);transition:background .25s}
+.panel.break{background:var(--brk)}
+.panel.dis{background:var(--dis)}
+.panel .what{font-size:14px;opacity:.9}
+.panel .state{font-size:20px;font-weight:700;margin-top:2px}
+.clock{font-size:64px;font-weight:700;letter-spacing:-.02em;margin:14px 0 4px;line-height:1}
+.clock-cap{font-size:13px;opacity:.9}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:22px;padding-top:16px;border-top:1px solid color-mix(in srgb,var(--on) 30%,transparent)}
+.stats div span{display:block;font-size:12px;opacity:.85}
+.stats div b{font-size:17px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 10px}
+.act{min-height:60px;border-radius:14px;font-weight:700;border:2px solid var(--line);background:var(--surface)}
+.act.brk{border-color:var(--brk);color:var(--brk)}
+.act.dis{border-color:var(--dis);color:var(--dis)}
+.act.on{color:var(--on)}
+.act.brk.on{background:var(--brk)}
+.act.dis.on{background:var(--dis)}
+
+/* review */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.grid4 span{display:block;font-size:12px;color:var(--muted)}
+.grid4 b{font-size:18px}
+.stepper{display:flex;align-items:center;gap:14px}
+.stepper button{width:48px;height:48px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);font-size:22px;font-weight:700}
+.stepper output{min-width:40px;text-align:center;font-size:24px;font-weight:700}
+.err{margin-top:12px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--dis) 14%,transparent);color:var(--dis);font-weight:600;font-size:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+
+/* summary */
+.bar{height:10px;background:var(--soft);border-radius:5px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--study);border-radius:5px}
+.trow{margin-bottom:16px}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.flag{margin-top:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--dis) 14%,transparent);color:var(--dis);font-weight:600;font-size:14px}
+.okmsg{margin-top:10px;font-size:14px;color:var(--muted)}
+.plot{position:relative;display:flex;gap:6px;height:110px;border-bottom:1px solid var(--line);margin-top:8px}
+.pcol{flex:1;position:relative}
+.pcol .g{position:absolute;bottom:0;left:15%;width:70%;background:var(--soft);border-radius:4px 4px 0 0;border:1px solid var(--line);border-bottom:0}
+.pcol .q{position:absolute;bottom:0;left:15%;width:70%;background:var(--study);border-radius:4px 4px 0 0}
+.labels{display:flex;gap:6px;margin-top:4px}
+.labels div{flex:1;text-align:center;font-size:11px;color:var(--muted);line-height:1.3}
+.labels div.today{color:var(--ink);font-weight:700}
+.tline{position:absolute;left:0;right:0;border-top:2px dashed var(--muted);opacity:.8;pointer-events:none}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.tstep{display:flex;align-items:center;justify-content:space-between}
+
+/* history */
+.day{display:flex;justify-content:space-between;align-items:baseline;margin:22px 0 8px}
+.day b{font-size:15px}
+.entry{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:8px}
+.entry .l1{display:flex;justify-content:space-between;gap:8px}
+.entry .l1 b{font-size:16px}
+.entry .topic{margin-top:2px}
+.entry .meta{margin-top:6px;font-size:13px;color:var(--muted)}
+.entry .del{margin-top:8px;font-size:13px;color:var(--muted);text-decoration:underline;min-height:32px}
+.entry .del.sure{color:var(--dis);font-weight:700}
+.empty{padding:28px 8px;text-align:center;color:var(--muted)}
+.notice{margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--soft);font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="shell">
+  <div id="app"></div>
+  <nav id="tabs" aria-label="Sections">
+    <button data-tab="timer" onclick="go('timer')">Timer</button>
+    <button data-tab="summary" onclick="go('summary')">Summary</button>
+    <button data-tab="history" onclick="go('history')">History</button>
+  </nav>
+</div>
+
+<script>
+const TRACKS = {
+  "Mains": ["Reading","Notes","Answer writing","Answer review","Revision"],
+  "Interview": ["DAF prep","Mock interview","Speaking practice","Opinion notes"],
+  "Current Affairs": ["Reading","Notes"]
+};
+const SPLIT = {"Mains":0.6,"Interview":0.25,"Current Affairs":0.15};
+const OUT_LABEL = {"Answer writing":"Answers written","Mock interview":"Mocks done"};
+
+const HAS_LS = (() => { try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); return true; }catch(e){ return false; } })();
+let S = {sessions:[], active:null, settings:{target:6}};
+let ui = {tab:"timer", track:"Mains", activity:"Reading", topic:"", stopping:false, out:1, note:"",
+          confirmDel:null, confirmDiscard:false, csv:"", json:"", restoreOpen:false, restoreMsg:"", man:null, persist:HAS_LS || !!window.storage};
+
+/* ---------- storage ---------- */
+const mem = {};
+async function sget(k){
+  try{
+    if(HAS_LS){ const v = localStorage.getItem("study:"+k); return v ? JSON.parse(v) : null; }
+    if(window.storage){ const r = await window.storage.get(k); if(r && r.value) return JSON.parse(r.value); }
+  }catch(e){}
+  return mem[k] ?? null;
+}
+async function sset(k,v){
+  mem[k] = v;
+  try{
+    if(HAS_LS) localStorage.setItem("study:"+k, JSON.stringify(v));
+    else if(window.storage) await window.storage.set(k, JSON.stringify(v));
+  }catch(e){}
+}
+const saveSessions = () => sset("sessions", S.sessions);
+const saveActive   = () => sset("active", S.active);
+const saveSettings = () => sset("settings", S.settings);
+
+/* ---------- helpers ---------- */
+const pad = n => String(n).padStart(2,"0");
+const fmt = ms => { const s = Math.max(0,Math.floor(ms/1000)); return pad(Math.floor(s/3600))+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60); };
+const fmtMin = ms => Math.round(ms/60000) + "m";
+const iso = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const clockT = ts => new Date(ts).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
+const h2 = n => (Math.round(n*100)/100).toFixed(2);
+const h1 = n => (Math.round(n*10)/10).toFixed(1);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const qh = e => Math.max(0, e.gross - e.brk - e.dis) / 60;   // quality hours
+const gh = e => e.gross / 60;                                  // gross hours
+
+function metrics(a, now){
+  const t = a.endTs || now;
+  let b = a.breakMs, d = a.distractMs;
+  if(!a.endTs){
+    const cur = t - a.phaseStart;
+    if(a.phase === "break") b += cur;
+    if(a.phase === "distract") d += cur;
+  }
+  const gross = t - a.start - a.gapMs;
+  const net = gross - b;
+  const quality = Math.max(0, net - d);
+  return {gross, b, d, net, quality};
+}
+
+/* ---------- actions ---------- */
+function go(t){ ui.tab = t; ui.confirmDel = null; ui.man = null; render(); }
+function pickTrack(t){ ui.track = t; ui.activity = TRACKS[t][0]; render(); }
+function pickActivity(a){ ui.activity = a; render(); }
+function setTopic(v){ ui.topic = v; }
+
+function startSession(){
+  const now = Date.now();
+  S.active = {track:ui.track, activity:ui.activity, topic:ui.topic.trim(), start:now, phase:"study",
+              phaseStart:now, breakMs:0, distractMs:0, breakCount:0, distractCount:0, gapMs:0};
+  ui.stopping = false; ui.confirmDiscard = false;
+  saveActive(); render();
+}
+
+function setPhase(p){
+  const a = S.active, now = Date.now(), cur = now - a.phaseStart;
+  if(a.phase === "break") a.breakMs += cur;
+  else if(a.phase === "distract") a.distractMs += cur;
+  if(a.phase === p){ a.phase = "study"; }
+  else { a.phase = p; if(p === "break") a.breakCount++; else a.distractCount++; }
+  a.phaseStart = now;
+  saveActive(); render();
+}
+
+function stopSession(){
+  const a = S.active, now = Date.now(), cur = now - a.phaseStart;
+  if(a.phase === "break") a.breakMs += cur;
+  else if(a.phase === "distract") a.distractMs += cur;
+  a.phase = "ended"; a.endTs = now;
+  ui.stopping = true; ui.out = OUT_LABEL[a.activity] ? 1 : 0; ui.note = ""; ui.confirmDiscard = false;
+  saveActive(); render();
+}
+
+function backToSession(){
+  const a = S.active, now = Date.now();
+  a.gapMs += now - a.endTs;
+  delete a.endTs; a.phase = "study"; a.phaseStart = now;
+  ui.stopping = false; ui.confirmDiscard = false;
+  saveActive(); render();
+}
+
+function bump(n){ ui.out = Math.max(0, ui.out + n); render(); }
+function setNote(v){ ui.note = v; }
+
+function saveSession(){
+  const a = S.active, m = metrics(a, Date.now());
+  S.sessions.push({
+    id: a.start, date: iso(new Date(a.start)), track: a.track, activity: a.activity, topic: a.topic,
+    start: a.start, end: a.endTs, gross: m.gross/60000, brk: m.b/60000, breaks: a.breakCount,
+    dis: m.d/60000, output: OUT_LABEL[a.activity] ? ui.out : null, note: ui.note.trim()
+  });
+  S.sessions.sort((x,y) => x.start - y.start);
+  S.active = null; ui.stopping = false; ui.topic = ""; ui.note = "";
+  saveSessions(); saveActive(); render();
+}
+
+function discardSession(){
+  if(!ui.confirmDiscard){ ui.confirmDiscard = true; render(); return; }
+  S.active = null; ui.stopping = false; ui.confirmDiscard = false;
+  saveActive(); render();
+}
+
+function delEntry(id){
+  if(ui.confirmDel !== id){ ui.confirmDel = id; render(); return; }
+  S.sessions = S.sessions.filter(e => e.id !== id);
+  ui.confirmDel = null; saveSessions(); render();
+}
+
+function stepTarget(d){
+  S.settings.target = Math.min(16, Math.max(1, Math.round((S.settings.target + d)*2)/2));
+  saveSettings(); render();
+}
+
+/* ---------- manual entry ---------- */
+function openManual(){
+  ui.man = {track:ui.track, activity:ui.activity, topic:"", date:iso(new Date()), start:"", end:"",
+            brk:"", breaks:"", dis:"", out:1, note:"", err:""};
+  render();
+}
+function closeManual(){ ui.man = null; render(); }
+function setM(k,v){ ui.man[k] = v; }
+function mTrack(t){ ui.man.track = t; ui.man.activity = TRACKS[t][0]; ui.man.err = ""; render(); }
+function mAct(a){ ui.man.activity = a; render(); }
+function mBump(n){ ui.man.out = Math.max(0, ui.man.out + n); render(); }
+function saveManual(){
+  const m = ui.man;
+  if(!m.date || !m.start || !m.end){ m.err = "Enter the date, start time and end time."; render(); return; }
+  const [sh,sm] = m.start.split(":").map(Number), [eh,em] = m.end.split(":").map(Number);
+  let gross = (eh*60+em) - (sh*60+sm);
+  if(gross <= 0) gross += 1440;
+  const brk = Number(m.brk)||0, dis = Number(m.dis)||0, breaks = Math.round(Number(m.breaks)||0);
+  if(brk < 0 || dis < 0){ m.err = "Break and distraction cannot be negative."; render(); return; }
+  if(brk + dis > gross){ m.err = "Break plus distraction is longer than the session itself."; render(); return; }
+  const [y,mo,d] = m.date.split("-").map(Number);
+  const startTs = new Date(y,mo-1,d,sh,sm).getTime();
+  let id = startTs; while(S.sessions.some(e => e.id === id)) id++;
+  S.sessions.push({id, date:m.date, track:m.track, activity:m.activity, topic:m.topic.trim(), start:startTs,
+    end:startTs+gross*60000, gross, brk, breaks, dis, output: OUT_LABEL[m.activity] ? m.out : null, note:m.note.trim()});
+  S.sessions.sort((x,y2) => x.start - y2.start);
+  ui.man = null; ui.tab = "history"; saveSessions(); render();
+}
+
+/* ---------- csv ---------- */
+function buildCsv(){
+  const head = ["Date","Track","Subject / Topic","Activity","Start","End","Break count","Break (min)","Distraction (min)",
+                "Gross hrs","Net hrs","Quality hrs","Focus %","Output","Notes"];
+  const q = v => '"' + String(v ?? "").replace(/"/g,'""') + '"';
+  const rows = S.sessions.map(e => {
+    const g = e.gross/60, n = (e.gross - e.brk)/60, qq = qh(e);
+    return [e.date, e.track, e.topic, e.activity, clockT(e.start), clockT(e.end), e.breaks, Math.round(e.brk),
+            Math.round(e.dis), h2(g), h2(n), h2(qq), g ? Math.round(qq/g*100)+"%" : "", e.output ?? "", e.note].map(q).join(",");
+  });
+  return [head.map(q).join(","), ...rows].join("\n");
+}
+function showCsv(){ ui.csv = buildCsv(); render(); }
+function showBackup(){ ui.json = JSON.stringify({app:"study-timer", v:1, sessions:S.sessions, settings:S.settings}); render(); }
+function openRestore(){ ui.restoreOpen = true; ui.restoreMsg = ""; render(); }
+function restoreBackup(){
+  const txt = document.getElementById("rbox").value.trim();
+  try{
+    const d = JSON.parse(txt);
+    if(!d || !Array.isArray(d.sessions)) throw new Error("bad");
+    const ok = d.sessions.filter(e => e && typeof e.id === "number" && typeof e.gross === "number" && e.track && e.activity);
+    const have = new Set(S.sessions.map(e => e.id)); let added = 0;
+    ok.forEach(e => { if(!have.has(e.id)){ S.sessions.push(e); have.add(e.id); added++; } });
+    S.sessions.sort((x,y) => x.start - y.start);
+    if(d.settings && d.settings.target) S.settings = d.settings;
+    saveSessions(); saveSettings();
+    ui.restoreMsg = "Restored " + added + " session" + (added===1?"":"s") + "."; ui.restoreOpen = false;
+  }catch(e){ ui.restoreMsg = "That text is not a valid backup. Paste the full backup text."; }
+  render();
+}
+function copyBox(id, btnId){
+  const ta = document.getElementById(id); ta.focus(); ta.select();
+  let ok = false;
+  try{ ok = document.execCommand("copy"); }catch(e){}
+  const btn = document.getElementById(btnId);
+  if(!ok && navigator.clipboard){ navigator.clipboard.writeText(ta.value).then(()=>{btn.textContent="Copied";}).catch(()=>{btn.textContent="Select the text and copy it";}); }
+  else btn.textContent = ok ? "Copied" : "Select the text and copy it";
+}
+function downloadCsv(){
+  try{
+    const blob = new Blob([ui.csv], {type:"text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "study-log.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){}
+}
+
+/* ---------- views ---------- */
+function todayStats(){
+  const t = iso(new Date());
+  const es = S.sessions.filter(e => e.date === t);
+  return {q: es.reduce((s,e)=>s+qh(e),0),
+          ans: es.filter(e=>e.activity==="Answer writing").reduce((s,e)=>s+(e.output||0),0)};
+}
+
+function viewTimer(){
+  if(S.active) return S.active.endTs ? viewReview() : viewRunning();
+  const ts = todayStats();
+  const tracks = Object.keys(TRACKS).map(t =>
+    `<button class="chip" aria-pressed="${ui.track===t}" onclick="pickTrack('${t}')">${t}</button>`).join("");
+  const acts = TRACKS[ui.track].map(a =>
+    `<button class="chip" aria-pressed="${ui.activity===a}" onclick="pickActivity('${a}')">${a}</button>`).join("");
+  return `
+    <h1>Start a session</h1>
+    <div class="today num"><span><b>${h1(ts.q)} h</b> quality today</span><span><b>${ts.ans}</b> answers today</span></div>
+    <span class="field-label">Track</span><div class="chips">${tracks}</div>
+    <span class="field-label">Activity</span><div class="chips">${acts}</div>
+    <span class="field-label">Topic (optional)</span>
+    <input type="text" id="topic" value="${esc(ui.topic)}" placeholder="e.g. Federalism" oninput="setTopic(this.value)">
+    <div style="height:22px"></div>
+    <button class="btn btn-primary" onclick="startSession()">Start</button>
+    <button class="btn btn-line" style="margin-top:10px;min-height:48px;font-size:15px" onclick="openManual()">Add a past session</button>
+    ${ui.persist ? "" : `<div class="notice">Entries are not being saved in this browser (private mode or storage blocked). They will be lost when you close the page.</div>`}`;
+}
+
+function viewRunning(){
+  const a = S.active, m = metrics(a, Date.now());
+  const cls = a.phase === "break" ? "break" : a.phase === "distract" ? "dis" : "";
+  const state = a.phase === "break" ? "On break" : a.phase === "distract" ? "Distracted" : "Studying";
+  const cap = a.phase === "study" ? "Quality time" : "Quality time (paused)";
+  return `
+    <div class="panel ${cls}" id="panel">
+      <div class="what">${esc(a.track)}: ${esc(a.activity)}${a.topic ? " - " + esc(a.topic) : ""}</div>
+      <div class="state" id="state">${state}</div>
+      <div class="clock num" id="clock">${fmt(m.quality)}</div>
+      <div class="clock-cap">${cap}</div>
+      <div class="stats num">
+        <div><span>Total</span><b id="s-gross">${fmt(m.gross)}</b></div>
+        <div><span>Breaks (${a.breakCount})</span><b id="s-brk">${fmtMin(m.b)}</b></div>
+        <div><span>Distracted</span><b id="s-dis">${fmtMin(m.d)}</b></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="act brk ${a.phase==="break"?"on":""}" onclick="setPhase('break')">${a.phase==="break"?"Resume":"Break"}</button>
+      <button class="act dis ${a.phase==="distract"?"on":""}" onclick="setPhase('distract')">${a.phase==="distract"?"Resume":"Distracted"}</button>
+    </div>
+    <button class="btn btn-line" onclick="stopSession()">Stop and save</button>
+    <p class="muted small" style="margin-top:12px">Started ${clockT(a.start)}. Tap Break or Distracted the moment it happens, then Resume.</p>`;
+}
+
+function viewReview(){
+  const a = S.active, m = metrics(a, a.endTs);
+  const g = m.gross/3600000, qq = m.quality/3600000, n = m.net/3600000;
+  const focus = g ? Math.round(qq/g*100) : 0;
+  const lbl = OUT_LABEL[a.activity];
+  const out = lbl ? `
+    <span class="field-label">${lbl}</span>
+    <div class="stepper"><button aria-label="Less" onclick="bump(-1)">-</button><output class="num">${ui.out}</output><button aria-label="More" onclick="bump(1)">+</button></div>` : "";
+  return `
+    <h1>Session done</h1>
+    <p class="muted" style="margin:4px 0 14px">${esc(a.track)}: ${esc(a.activity)}${a.topic ? " - " + esc(a.topic) : ""}</p>
+    <div class="card"><div class="grid4 num">
+      <div><span>Gross</span><b>${h2(g)}</b></div>
+      <div><span>Net</span><b>${h2(n)}</b></div>
+      <div><span>Quality</span><b>${h2(qq)}</b></div>
+      <div><span>Focus</span><b>${focus}%</b></div>
+    </div>
+    <p class="muted small" style="margin-top:12px">${clockT(a.start)} to ${clockT(a.endTs)}. ${a.breakCount} break${a.breakCount===1?"":"s"} (${fmtMin(m.b)}), distraction ${fmtMin(m.d)}.</p></div>
+    ${out}
+    <span class="field-label">Note (optional)</span>
+    <textarea placeholder="e.g. intro was weak, ran out of time" oninput="setNote(this.value)">${esc(ui.note)}</textarea>
+    <div style="height:16px"></div>
+    <button class="btn btn-primary" onclick="saveSession()">Save session</button>
+    <div class="row2">
+      <button class="btn btn-line" style="min-height:48px;font-size:15px" onclick="backToSession()">Keep going</button>
+      <button class="btn btn-danger" style="min-height:48px;font-size:15px" onclick="discardSession()">${ui.confirmDiscard ? "Tap again to discard" : "Discard"}</button>
+    </div>`;
+}
+
+function weekStart(){
+  const d = new Date(); const dow = (d.getDay()+6)%7;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow);
+}
+
+function viewSummary(){
+  const ws = weekStart(), we = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate()+6);
+  const a = iso(ws), b = iso(we);
+  const wk = S.sessions.filter(e => e.date >= a && e.date <= b);
+  const T = S.settings.target;
+
+  let rows = "", totQ = 0, totG = 0, totT = 0;
+  for(const t of Object.keys(TRACKS)){
+    const es = wk.filter(e => e.track === t);
+    const q = es.reduce((s,e)=>s+qh(e),0), g = es.reduce((s,e)=>s+gh(e),0);
+    const tgt = T*7*SPLIT[t];
+    totQ += q; totG += g; totT += tgt;
+    const pct = tgt ? Math.min(100, q/tgt*100) : 0;
+    const foc = g ? Math.round(q/g*100) : null;
+    rows += `<div class="trow"><div class="top"><b>${t}</b><span class="num small muted">${h1(q)} of ${h1(tgt)} h${foc!==null?`, focus ${foc}%`:""}</span></div>
+      <div class="bar" role="img" aria-label="${t} ${Math.round(pct)} percent of weekly target"><i style="width:${pct}%"></i></div></div>`;
+  }
+  const totPct = totT ? Math.min(100, totQ/totT*100) : 0;
+  const totFoc = totG ? Math.round(totQ/totG*100) : null;
+
+  // mains balance
+  const mains = wk.filter(e => e.track === "Mains");
+  const mq = mains.reduce((s,e)=>s+qh(e),0);
+  let bal = "";
+  if(mq > 0){
+    const lines = TRACKS["Mains"].map(act => {
+      const q = mains.filter(e=>e.activity===act).reduce((s,e)=>s+qh(e),0);
+      return q > 0 ? `<div class="top" style="margin-bottom:6px"><span>${act}</span><span class="num muted small">${h1(q)} h, ${Math.round(q/mq*100)}%</span></div>` : "";
+    }).join("");
+    const rd = mains.filter(e=>e.activity==="Reading").reduce((s,e)=>s+qh(e),0)/mq;
+    bal = `<h2>Mains: reading vs writing</h2><div class="card">${lines}
+      ${rd > 0.7 ? `<div class="flag">Reading is ${Math.round(rd*100)}% of Mains time. Add more answer writing.</div>` : `<div class="okmsg">Reading is ${Math.round(rd*100)}% of Mains time. Red flag starts above 70%.</div>`}</div>`;
+  }
+
+  const answers = wk.filter(e=>e.activity==="Answer writing").reduce((s,e)=>s+(e.output||0),0);
+  const mocks = wk.filter(e=>e.activity==="Mock interview").reduce((s,e)=>s+(e.output||0),0);
+
+  // last 7 days chart
+  const days = [];
+  for(let i=6;i>=0;i--){ const d = new Date(); d.setDate(d.getDate()-i); days.push(d); }
+  const data = days.map(d => { const es = S.sessions.filter(e=>e.date===iso(d));
+    return {d, g: es.reduce((s,e)=>s+gh(e),0), q: es.reduce((s,e)=>s+qh(e),0)}; });
+  const mx = Math.max(T, ...data.map(x=>x.g)) * 1.1;
+  const bars = data.map(x => `<div class="pcol"><div class="g" style="height:${x.g/mx*100}%"></div><div class="q" style="height:${x.q/mx*100}%"></div></div>`).join("");
+  const labs = data.map((x,i) => `<div class="num ${i===6?"today":""}">${x.q>0?h1(x.q):"-"}<br>${"SMTWTFS"[x.d.getDay()]}</div>`).join("");
+  const tlineBottom = (T/mx*100);
+
+  return `
+    <h1>This week</h1>
+    <p class="muted small">Week of ${ws.toLocaleDateString([], {day:"numeric",month:"short"})}</p>
+    <h2>Quality hours against target</h2>
+    <div class="card">${rows}
+      <div class="trow" style="margin-bottom:0"><div class="top"><b>Total</b><span class="num small muted">${h1(totQ)} of ${h1(totT)} h${totFoc!==null?`, focus ${totFoc}%`:""}</span></div>
+      <div class="bar"><i style="width:${totPct}%"></i></div></div>
+      ${totG>0?`<p class="muted small num" style="margin-top:12px">Lost to breaks and distraction: ${h1(totG-totQ)} h</p>`:""}
+    </div>
+    <h2>Output this week</h2>
+    <div class="card"><div class="grid4 num" style="grid-template-columns:1fr 1fr">
+      <div><span>Mains answers written</span><b>${answers}</b></div>
+      <div><span>Mock interviews</span><b>${mocks}</b></div></div></div>
+    ${bal}
+    <h2>Last 7 days</h2>
+    <div class="card">
+      <div class="plot" role="img" aria-label="Daily gross and quality hours for the last 7 days">${bars}<div class="tline" style="bottom:${tlineBottom}%"></div></div><div class="labels">${labs}</div>
+      <div class="legend"><span><i style="background:var(--soft);border:1px solid var(--line)"></i>Gross</span><span><i style="background:var(--study)"></i>Quality</span><span>Dashed line: daily target</span></div>
+    </div>
+    <h2>Daily target</h2>
+    <div class="card tstep"><div><b class="num">${h1(T)} quality hours</b><div class="muted small">Split: Mains 60%, Interview 25%, Current Affairs 15%</div></div>
+      <div class="stepper"><button aria-label="Lower target" onclick="stepTarget(-0.5)">-</button><button aria-label="Raise target" onclick="stepTarget(0.5)">+</button></div></div>`;
+}
+
+function backupHtml(){
+  let h = `<h2>Backup</h2>`;
+  if(ui.restoreMsg) h += `<div class="notice" style="margin:0 0 10px">${esc(ui.restoreMsg)}</div>`;
+  if(!ui.csv) h += `<button class="btn btn-line" style="min-height:48px;font-size:15px" onclick="showCsv()">Export as CSV (for the sheet)</button>`;
+  else h += `<textarea id="csvbox" readonly style="min-height:120px;font-size:12px">${esc(ui.csv)}</textarea>
+    <div class="row2"><button class="btn btn-primary" id="copybtn" style="min-height:48px;font-size:15px" onclick="copyBox('csvbox','copybtn')">Copy</button>
+    <button class="btn btn-line" style="min-height:48px;font-size:15px" onclick="downloadCsv()">Download</button></div>
+    <p class="muted small" style="margin-top:10px">Paste into the Log sheet of Study_Tracker.xlsx. Columns match.</p>`;
+  if(!ui.json) h += `<button class="btn btn-line" style="margin-top:10px;min-height:48px;font-size:15px" onclick="showBackup()">Back up all data</button>`;
+  else h += `<span class="field-label">Backup text: copy and keep it in Notes or WhatsApp</span>
+    <textarea id="jsonbox" readonly style="min-height:100px;font-size:12px">${esc(ui.json)}</textarea>
+    <button class="btn btn-primary" id="copybtn2" style="margin-top:10px;min-height:48px;font-size:15px" onclick="copyBox('jsonbox','copybtn2')">Copy backup</button>`;
+  if(!ui.restoreOpen) h += `<button class="btn btn-line" style="margin-top:10px;min-height:48px;font-size:15px" onclick="openRestore()">Restore from backup</button>`;
+  else h += `<span class="field-label">Paste backup text here</span>
+    <textarea id="rbox" style="min-height:100px;font-size:12px"></textarea>
+    <button class="btn btn-primary" style="margin-top:10px;min-height:48px;font-size:15px" onclick="restoreBackup()">Restore</button>`;
+  return h;
+}
+
+function viewHistory(){
+  const list = [...S.sessions].reverse();
+  let html = `<h1>History</h1><button class="btn btn-line" style="margin-top:12px;min-height:48px;font-size:15px" onclick="openManual()">Add a past session</button>`;
+  if(!list.length) return html + `<div class="empty">No sessions yet. Finish one on the Timer tab and it shows up here.</div>` + backupHtml();
+  const byDay = {};
+  list.forEach(e => (byDay[e.date] = byDay[e.date] || []).push(e));
+  for(const date of Object.keys(byDay)){
+    const es = byDay[date];
+    const q = es.reduce((s,e)=>s+qh(e),0);
+    const dl = new Date(date+"T00:00:00").toLocaleDateString([], {weekday:"short",day:"numeric",month:"short"});
+    html += `<div class="day"><b>${dl}</b><span class="muted small num">${h1(q)} h quality</span></div>`;
+    for(const e of es){
+      const g = gh(e), qq = qh(e), foc = g ? Math.round(qq/g*100) : 0;
+      const out = e.output != null ? `, ${e.output} ${e.activity==="Mock interview"?"mock":"answer"}${e.output===1?"":"s"}` : "";
+      html += `<div class="entry">
+        <div class="l1"><b>${esc(e.activity)}</b><span class="muted small">${esc(e.track)}</span></div>
+        ${e.topic?`<div class="topic">${esc(e.topic)}</div>`:""}
+        <div class="meta num">${clockT(e.start)} to ${clockT(e.end)}. Quality ${h2(qq)} of ${h2(g)} h (${foc}%)${out}</div>
+        ${e.note?`<div class="meta">${esc(e.note)}</div>`:""}
+        <button class="del ${ui.confirmDel===e.id?"sure":""}" onclick="delEntry(${e.id})">${ui.confirmDel===e.id?"Tap again to delete":"Delete"}</button></div>`;
+    }
+  }
+  return html + backupHtml();
+}
+
+
+function viewManual(){
+  const m = ui.man;
+  const tracks = Object.keys(TRACKS).map(t => `<button class="chip" aria-pressed="${m.track===t}" onclick="mTrack('${t}')">${t}</button>`).join("");
+  const acts = TRACKS[m.track].map(a => `<button class="chip" aria-pressed="${m.activity===a}" onclick="mAct('${a}')">${a}</button>`).join("");
+  const lbl = OUT_LABEL[m.activity];
+  const out = lbl ? `<span class="field-label">${lbl}</span>
+    <div class="stepper"><button aria-label="Less" onclick="mBump(-1)">-</button><output class="num">${m.out}</output><button aria-label="More" onclick="mBump(1)">+</button></div>` : "";
+  return `
+    <h1>Add a past session</h1>
+    <span class="field-label">Track</span><div class="chips">${tracks}</div>
+    <span class="field-label">Activity</span><div class="chips">${acts}</div>
+    <span class="field-label">Topic (optional)</span>
+    <input type="text" value="${esc(m.topic)}" placeholder="e.g. Federalism" oninput="setM('topic',this.value)">
+    <span class="field-label">Date</span>
+    <input type="date" value="${m.date}" onchange="setM('date',this.value)">
+    <div class="row2" style="margin-top:0">
+      <div><span class="field-label">Start time</span><input type="time" value="${m.start}" onchange="setM('start',this.value)"></div>
+      <div><span class="field-label">End time</span><input type="time" value="${m.end}" onchange="setM('end',this.value)"></div>
+    </div>
+    <p class="muted small" style="margin-top:6px">If the end time is earlier than the start, it counts as past midnight.</p>
+    <div class="row2" style="margin-top:0">
+      <div><span class="field-label">Break (min)</span><input type="number" inputmode="numeric" min="0" value="${m.brk}" placeholder="0" oninput="setM('brk',this.value)"></div>
+      <div><span class="field-label">Break count</span><input type="number" inputmode="numeric" min="0" value="${m.breaks}" placeholder="0" oninput="setM('breaks',this.value)"></div>
+    </div>
+    <span class="field-label">Distraction (min)</span>
+    <input type="number" inputmode="numeric" min="0" value="${m.dis}" placeholder="0" oninput="setM('dis',this.value)">
+    ${out}
+    <span class="field-label">Note (optional)</span>
+    <textarea oninput="setM('note',this.value)">${esc(m.note)}</textarea>
+    ${m.err ? `<div class="err" role="alert">${esc(m.err)}</div>` : ""}
+    <div style="height:16px"></div>
+    <button class="btn btn-primary" onclick="saveManual()">Save session</button>
+    <button class="btn btn-line" style="margin-top:10px;min-height:48px;font-size:15px" onclick="closeManual()">Cancel</button>`;
+}
+
+/* ---------- render ---------- */
+function render(){
+  const v = ui.man ? viewManual() : ui.tab === "timer" ? viewTimer() : ui.tab === "summary" ? viewSummary() : viewHistory();
+  document.getElementById("app").innerHTML = v;
+  document.querySelectorAll("#tabs button").forEach(b => {
+    if(b.dataset.tab === ui.tab) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current");
+  });
+}
+
+setInterval(() => {
+  if(ui.tab !== "timer" || !S.active || S.active.endTs) return;
+  const m = metrics(S.active, Date.now());
+  const set = (id,t) => { const el = document.getElementById(id); if(el) el.textContent = t; };
+  set("clock", fmt(m.quality)); set("s-gross", fmt(m.gross)); set("s-brk", fmtMin(m.b)); set("s-dis", fmtMin(m.d));
+}, 1000);
+
+if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+
+(async function init(){
+  const [ss, ac, st] = await Promise.all([sget("sessions"), sget("active"), sget("settings")]);
+  if(Array.isArray(ss)) S.sessions = ss;
+  if(ac) { S.active = ac; if(ac.endTs) ui.stopping = true; }
+  if(st && st.target) S.settings = st;
+  render();
+})();
+</script>
+</body>
+</html>
